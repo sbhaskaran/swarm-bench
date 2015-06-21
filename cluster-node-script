@@ -1,0 +1,59 @@
+#!/bin/bash
+##
+export DOCKER_HOST=tcp://0.0.0.0:2375 
+
+usage () {
+  printf "
+  usage: %s [options]
+   options:
+     -n <hostname/ip> for running on specific node
+     -t  tocken string  
+
+  -h           optional  Print this help message\n" "$myname"
+  exit 1
+}
+
+while getopts :h:n:t: args
+do
+  case $args in
+  h) usage;;
+  n) node="$2";;
+  t) token="$4";;
+  *) usage ;;
+  esac
+done
+echo "node=$node"
+echo $token
+
+if [ -z "$token" ]
+then 
+ echo "you have to specify token with  -t "
+ usage
+else 
+ if [ -z "$node" ];then
+   echo "!!!running on all nodes!!!!"
+
+   for i in `docker run --rm swarm list token://$token`
+    do
+     echo $i 
+       docker -H tcp://$i run -it --rm --net host --pid host --cap-add audit_control \
+          -v /var/lib:/var/lib \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v /usr/lib/systemd:/usr/lib/systemd \
+          -v /sbin/auditctl:/sbin/auditctl \
+          -v /etc:/etc -v /etc/docker:/etc/docker --label docker-bench-security \
+           diogomonica/docker-bench-security  |egrep -i 'warn|yell'
+ 
+    done 
+  else
+     echo "running on $node" 
+     host=$node
+     docker -H tcp://$host:2375 run -it --rm --net host --pid host --cap-add audit_control \
+         -v /var/lib:/var/lib \
+         -v /var/run/docker.sock:/var/run/docker.sock \
+         -v /usr/lib/systemd:/usr/lib/systemd \
+         -v /sbin/auditctl:/sbin/auditctl \
+         -v /etc:/etc -v /etc/docker:/etc/docker --label docker-bench-security \
+         diogomonica/docker-bench-security  |egrep -i 'warn|yell'
+fi
+fi
